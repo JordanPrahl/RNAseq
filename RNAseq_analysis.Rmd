@@ -83,26 +83,30 @@ colnames(tData) <- c("Geno", "PC1", "PC2", "PC3")
 
 ```{r, DIMENSIONALITY PLOTS}
 
+BiocManager::install("devtools")
+library(devtools)
+devtools::install_github("cmartin/ggConvexHull")
+library(ggConvexHull)
+
 { #START PLOT HERE
      # Choose your dimensions in the xydims vector below.
      # PCA has 33 dimensions, UMAP has 5, and TSNE only has 3 dimensions
   
   xydims <- c(
-              "PC2",  # X-Axis
-              "PC3",  # Y-axis
-              "TSNE"  # Dimension reduction method: UMAP, PCA, or TSNE
+              "PC4",  # X-Axis
+              "PC5",  # Y-axis
+              "PCA"  # Dimension reduction method: UMAP, PCA, or TSNE
               ) 
   
   if(xydims[3]=="UMAP") {data1=uData} else if(xydims[3]=="PCA") {data1=pData} else {data1=tData}
-  
-  ggplot(data=data1, aes_string(x=noquote(paste0(xydims[1])),y=noquote(paste0(xydims[2])))) +
-    geom_point(aes(color = Geno, size=10)) +
-    #geom_density2d(alpha=.5) +
-    ggtitle(paste0(xydims[3]," of RNAseq data")) +
-    xlab(paste0(xydims[1])) + 
-    ylab(paste0(xydims[2])) +
-    theme_minimal() +
-    scale_colour_manual(values=cbPalette)
+
+   ggplot(data=data1, aes_string(x=noquote(paste0(xydims[1])),y=noquote(paste0(xydims[2])))) +
+     geom_point(aes(color = Geno),size=3) +
+     ggtitle(paste0(xydims[3]," of RNAseq data")) +
+     xlab(paste0(xydims[1])) + 
+     ylab(paste0(xydims[2])) +
+     theme_minimal() +
+     geom_convexhull(alpha = 0.4,aes(fill = Geno))
   
   ggsave(paste0("./plots/",xydims[3],"_figure_",xydims[1],"_",xydims[2],".png"), width = 10, height = 5)
 
