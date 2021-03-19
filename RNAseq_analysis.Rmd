@@ -228,8 +228,6 @@ tsne <- Rtsne(t(dat), perplexity = 5, scale=T, dims = 3) # got warning perplexit
 dat2 <- tsne$Y
 Geno <-c("WT", "WT","WT", "WT","WT", "WT","WT", "WT","WT", "WT","CRISPR Contol","CRISPR Contol","CRISPR Contol","CRISPR Contol","CRISPR Contol","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","A/-","A/-","A/-","G/-","G/-","G/-","A/G","A/G","A/G")
 
-
-
 tData <-cbind.data.frame(Geno, dat2)
 head(tData)
 colnames(tData) <- c("Geno", "PC1", "PC2", "PC3")
@@ -237,9 +235,7 @@ colnames(tData) <- c("Geno", "PC1", "PC2", "PC3")
 write.csv2(data.frame(tData), './TSNE_dataframe.csv')
 ```
 
-```{r, Color palette}
-cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")
-```
+
 
 ```{r, DIMENSIONALITY PLOTS}
 
@@ -268,67 +264,4 @@ cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2",
 
 }
 
-```
-
-
-```{r, Steve's code for formal relationships between groups}
-pca <- prcomp(t(cpm(my_dge, log=TRUE)))
-top5 <- pca$x[, 1:5]
-design <- model.matrix(~0 + Condition + ..., data = samplekey)
-fit <- lmFit(t(top5), design, method="robust", maxit=100)
-fit <- ...contrasts..
-decideTests(fit)
-topTable(fit, coef=xxx) for each contrast
-```
-
-
-
-
-
-```{r, alternative plots}
-library(ggplot2)
-library(Rtsne)
-
-dat <- just_data
-dat2 <- t(dat)
-
-
-# tSNE
-tsne <- Rtsne(dat[!duplicated(dat), -5])
-
-df <- data.frame(x = tsne$Y[,1],
-                 y = tsne$Y[,2],
-                 Species = dat[!duplicated(dat), 5])
-
-ggplot(df, aes(x, y, colour = Species)) +
-  geom_point()
-
-# tSNE alternative
-tsne <- Rtsne(t(dat), perplexity = 5) # got warning perplexity is too large
-
-dat2 <- tsne$Y
-Geno <-c("WT", "WT","WT", "WT","WT", "WT","WT", "WT","WT", "WT","CRISPR Contol","CRISPR Contol","CRISPR Contol","CRISPR Contol","CRISPR Contol","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","A/-","A/-","A/-","G/-","G/-","G/-","A/G","A/G","A/G")
-
-View(dat2)
-dat3 <-cbind.data.frame(Geno, dat2)
-View(dat3)
-df <- data.frame(x = dat3[,2],
-                 y = dat3[,3],
-                 Geno = dat3$Geno)
-
-
-p <- ggplot(data <- dat3, aes(x=dat3[,2], y=dat3[,3])) +
-  geom_point(aes(color = Geno, size=10)) +
-  ggtitle("TSNE of RNAseq data") +
-  xlab(" tSNE Component 1") + 
-  ylab("tSNE Component 2")
-
-p
-
-
-
-# UMAP
-library(M3C)
-var <- seq(1, ncol(dat))
-M3C::umap(dat, labels=var, controlscale=T, scale=1, legendtitle="var", printres=T, printwidth=24)
 ```
