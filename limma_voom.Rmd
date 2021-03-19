@@ -1,0 +1,129 @@
+---
+title: "RNAseq data prep"
+author: "Jordan Prahl"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+BiocManager::install("edgeR")
+BiocManager::install("limma")
+BiocManager::install("AnnotationDbi")
+BiocManager::install("org.Hs.eg.db")
+BiocManager::install("umap")
+BiocManager::install("ddply")
+BiocManager::install("plyr")
+BiocManager::install("ggpubr")
+BiocManager::install("Rtsne")
+BiocManager::install("M3C")
+library(readxl)
+library(M3C)
+library(Rtsne)
+library(umap)
+library(ggpubr)
+library(edgeR)
+library(dplyr)
+library(tidyverse)
+library(limma)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(reshape2)
+library(ggplot2)
+library(ggfortify)
+library(magrittr)
+library(tibble)
+library(DataCombine)
+library(umap)
+library(ddply)
+library(plyr)
+```
+
+load count files from STAR and put into a matrix 
+```{r}
+ff <- list.files( path = "./readCounts", pattern = "*ReadsPerGene.out.tab$", full.names = TRUE ) # make a list of file names
+counts.files <- lapply( ff, read.table, skip = 4 )          ### read files and create data frame without first 4 rows 
+counts <- sapply( counts.files, function(x) x[ , 2 ] )      ### put counts for each sample into a matrix based on values in the second column (non-stranded counts)
+ff <- gsub( "_ReadsPerGene.out.tab", "", ff )               ### remove "_ReadsPerGene.out.tab" from end of file names
+ff <- gsub( "./readCounts", "", ff )                        ### remove file path from sample names
+colnames(counts) <- ff                                      ### add column lables to count matrix (sample names)
+row.names(counts) <- counts.files[[1]]$V1                   ### add the ensemble ID to rows of count matrix
+```
+
+remove decimals from ENSEMBLE IDs
+```{r}
+rownames(counts) <- gsub("\\..+","",rownames(counts))
+```
+
+
+remove duplicates from ENSEMBLE IDs
+```{r}
+counts <- unique.matrix(counts)
+```
+
+create a DGEList from counts
+```{r}
+my_dge <- DGEList(counts, genes=rownames(counts))
+my_dge$genes$Symbol <- mapIds(org.Hs.eg.db,         # replace org.Mm.eg.db with org.Hs.eg.db
+                         rownames(my_dge),
+                         keytype="ENSEMBL", 
+                         column="SYMBOL")
+```
+
+filter counts
+```{r}
+keep <- rowSums(cpm(my_dge) > 0.5) >= 2
+``
+
+```{r}
+my_dge <- my_dge[keep, , keep.lib.sizes=FALSE]
+```
+
+normalize the counts
+```{r}
+my_dge <- calcNormFactors(my_dge)
+```
+
+calculate CPM and join gene annotation to dataframe
+```{r}
+expr_data <- data.frame(cpm(my_dge)) %>% 
+  rownames_to_column(var="genes") %>%
+  dplyr::left_join(data.frame(my_dge$genes), by="genes") %>%
+  dplyr::select(genes,Symbol,everything())
+                   
+write.csv(data.frame(expr_data), './annotations.csv')
+```
+
+```{r, read in annotation data}
+expr_data <- read.csv('./annotations_new.csv')
+```
+
+```{r, melt data}
+m.data <- melt(expr_data)
+Replaces <- data.frame(from = c("X.JPA1", "X.JPA2", "X.JPA3", "X.JPG1", "X.JPG2", "X.JPG3", "X.JPW1", "X.JPW2", "X.JPW3"), to = c("A/-", "A/-", "A/-", "G/-", "G/-", "G/-", "A/G", "A/G", "A/G"))
+r.m.data <- FindReplace(data = m.data, Var = "variable", replaceData = Replaces,
+                     from = "from", to = "to", exact = FALSE)
+```
+
+```{r, single gene expression}
+GENE <- "BAG3"
+
+gdata1 <- subset(gdata, gdata[,"Symbol"]==GENE)
+
+model1 <- aov(data = gdata1, value~variable)
+text1 <- summary(model1)
+text2 <- text1[[1]]$'Pr(>F)'
+
+g <- ggplot(gdata1, aes(variable,value))
+g + geom_boxplot(fill='#A4A4A4', color="black") +
+  geom_dotplot(binaxis='y', stackdir='center', dotsize=1.0) +
+  theme_minimal() +
+  ylab("Read Counts") + xlab("Genotype") + ggtitle(GENE, text2) + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size=25, face="bold"), 
+    axis.text.x = element_text(size=15),
+    axis.text.y = element_text(size=12)
+  ) 
+```
