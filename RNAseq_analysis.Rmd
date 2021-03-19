@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Below are the libraries I called upon in my analysis, but several of these are leftover from old code. I will try to mark the ones you definitely need.
 ```{r}
 BiocManager::install("edgeR")
 BiocManager::install("limma")
@@ -18,9 +19,20 @@ BiocManager::install("umap")
 BiocManager::install("ggpubr")
 BiocManager::install("Rtsne")
 BiocManager::install("M3C")
+BiocManager::install("devtools")
+library(devtools)         #NEED
+devtools::install_github("cmartin/ggConvexHull")
+
+### For sure needed
+library(ggplot2)
+library(ggConvexHull)
 library(M3C)
 library(Rtsne)
 library(ggpubr)
+library(umap)
+library(readxl)
+
+### Might need below
 library(edgeR)
 library(dplyr)
 library(tidyverse)
@@ -28,20 +40,21 @@ library(limma)
 library(AnnotationDbi)
 library(org.Hs.eg.db)
 library(reshape2)
-library(ggplot2)
 library(ggfortify)
 library(magrittr)
 library(tibble)
 library(DataCombine)
-library(umap)
-library(readxl)
+
+
+
 ```
 
 Reading in the full Z-score data from Steve's analysis, but then I filter it down so it's just a dataframe, with the samples names as the colnames, and zscores as the data (each row being a ensembl_gene_id.
 ```{r, Dimension Reduction Data Prep}
+# Read in full dataset
 full_data <- read_excel("202000903_7compar_luhmes_lesion_jp_Results_all.xlsx")
 
-# filter the data, I know there are more efficient ways to do this but I don't care
+# filter the data, I know there are more efficient ways. Depending on the format of your data you won't do exactly this.
 full_data <- full_data[, grep("^logFC", colnames(full_data), invert = T)]
 full_data <- full_data[, grep("^AveExpr", colnames(full_data), invert = T)]
 full_data <- full_data[, grep("^t_", colnames(full_data), invert = T)]
@@ -55,46 +68,38 @@ just_data <- full_data[, grep("^ensembl", colnames(full_data), invert = T)]
 ```
 
 ```{r, PCA}
-pca_data <- prcomp(t(just_data), scale. = T)
-pData <- data.frame(pca_data$x)
+geneGroups <- c("WT", "WT", "WT", "WT", "WT", "WT", "WT", "WT", "WT", "WT", "CRISPR_ctrl", "CRISPR_ctrl", "CRISPR_ctrl", "CRISPR_ctrl", "CRISPR_ctrl", "Undiff", "Undiff", "Undiff", "Undiff", "Undiff", "Undiff", "Undiff", "Undiff", "Undiff", "A/-", "A/-", "A/-", "G/-", "G/-", "G/-", "A/G", "A/G", "A/G")
 
-pData$Geno <- c("WT", "WT","WT", "WT","WT", "WT","WT", "WT","WT", "WT","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","A/-","A/-","A/-","G/-","G/-","G/-","A/G","A/G","A/G")
 
-barplot(pca_data$sdev) # Bar graph of variance
+pca_data <- prcomp(t(just_data), scale = T)                    # Use prcomp function to do dimensionality reduction (scale should be TRUE)
+pData <- data.frame(pca_data$x)                                # The "x" data is the set you want
+pData$Geno <- geneGroups                                       # Add a column for condition, in this case, Geno
+barplot(pca_data$sdev)                                         # Quick graph of variance
 ```
 
 ``` {r, UMAP}
-rna.umap <- umap::umap(t(just_data), n_components=5, scale=T)
-uData <- data.frame(rna.umap$layout)
-
-uData$Geno <- c("WT", "WT","WT", "WT","WT", "WT","WT", "WT","WT", "WT","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","A/-","A/-","A/-","G/-","G/-","G/-","A/G","A/G","A/G")
-
-colnames(uData) <- c("PC1","PC2","PC3","PC4","PC5","Geno")
+rna.umap <- umap::umap(t(just_data), n_components=5, scale=T)   # Use the UMAP function to do dimensionality reduction
+uData <- data.frame(rna.umap$layout)                            # grab the "layout" data
+uData$Geno <- geneGroups                                        # Add a column for condition, in this case, Geno
+colnames(uData) <- c("PC1","PC2","PC3","PC4","PC5","Geno")      # Reset the column names to match the PCA 
 ```
  
 ```{r, t-SNE}
-tsne <- Rtsne(t(dat), perplexity = 5, scale=T, dims = 3) # 3 is the maximum number 
-
-tData <- tsne$Y
-tData$Geno <- c("WT", "WT","WT", "WT","WT", "WT","WT", "WT","WT", "WT","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","CRISPR_ctrl","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","Undiff","A/-","A/-","A/-","G/-","G/-","G/-","A/G","A/G","A/G")
-
-colnames(tData) <- c("Geno", "PC1", "PC2", "PC3")
+tsne <- Rtsne(t(dat), perplexity = 5, scale=T, dims = 3)        # Max dimensions with the Rtsne function =3.  
+tData <- tsne$Y                                                 # Use the "Y" dataset
+tData$Geno <- geneGroups                                        # Add the column for condition
+colnames(tData) <- c("Geno", "PC1", "PC2", "PC3")               # Change the colnames to match PCA and work in the plot code below
 ```
 
 ```{r, DIMENSIONALITY PLOTS}
-
-BiocManager::install("devtools")
-library(devtools)
-devtools::install_github("cmartin/ggConvexHull")
-library(ggConvexHull)
 
 { #START PLOT HERE
      # Choose your dimensions in the xydims vector below.
      # PCA has 33 dimensions, UMAP has 5, and TSNE only has 3 dimensions
   
   xydims <- c(
-              "PC4",  # X-Axis
-              "PC5",  # Y-axis
+              "PC1",  # X-Axis
+              "PC2",  # Y-axis
               "PCA"  # Dimension reduction method: UMAP, PCA, or TSNE
               ) 
   
